@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Davis Funds AI Framework - S&P 500 & NASDAQ Analyzer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for beautiful analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        davis: {
+                            blue: '#0F2C59',
+                            gold: '#DAC0A3',
+                            cream: '#F8F0E5',
+                            dark: '#101827',
+                            accent: '#1E40AF',
+                            enabler: '#10B981',
+                            user: '#3B82F6',
+                            emerging: '#8B5CF6',
+                            insulated: '#6B7280',
+                            casualty: '#EF4444'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-chart-line text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-white tracking-wide">DAVIS FUNDS FRAMEWORK</h1>
+                    <p class="text-xs text-slate-400">S&P 500 & NASDAQ AI Structural Analyzer</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800 text-sm">
+                <button onclick="switchTab('analyzer')" id="tab-analyzer" class="px-4 py-2 rounded-md font-medium transition-all bg-blue-600 text-white shadow">
+                    <i class="fa-solid fa-magnifying-glass-chart mr-1.5"></i> Equity Database
+                </button>
+                <button onclick="switchTab('simulator')" id="tab-simulator" class="px-4 py-2 rounded-md font-medium transition-all text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-pie-chart mr-1.5"></i> Index Simulator
+                </button>
+                <button onclick="switchTab('theory')" id="tab-theory" class="px-4 py-2 rounded-md font-medium transition-all text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-graduation-cap mr-1.5"></i> The Davis Thesis
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
+        
+        <!-- Tab 1: Equity Database Analyzer -->
+        <div id="section-analyzer" class="space-y-6">
+            <!-- Framework Quick Reference Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-emerald-500/20 hover:border-emerald-500/40 transition cursor-pointer" onclick="filterByCategory('Enablers')">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">1. Enablers</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 line-clamp-2">Picks & Shovels, high capex, structural winners.</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-blue-500/20 hover:border-blue-500/40 transition cursor-pointer" onclick="filterByCategory('Users')">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-blue-400">2. Users</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 line-clamp-2">Legacy giants using proprietary data to slash costs.</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-purple-500/20 hover:border-purple-500/40 transition cursor-pointer" onclick="filterByCategory('Emerging Winners')">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-purple-400">3. Emerging</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 line-clamp-2">Pure-plays, high multiples, high execution risk.</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-500/20 hover:border-slate-500/40 transition cursor-pointer" onclick="filterByCategory('Insulated')">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">4. Insulated</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 line-clamp-2">Physical, offline moats, decoupled from digital threat.</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-red-500/20 hover:border-red-500/40 transition cursor-pointer" onclick="filterByCategory('Casualties')">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-red-400">5. Casualties</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 line-clamp-2">Vulnerable to automated substitution & margin erosion.</div>
+                </div>
+            </div>
+
+            <!-- Filters and Search Interface -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <!-- Search input -->
+                    <div class="relative md:col-span-2">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="search-bar" onkeyup="filterData()" placeholder="Search Ticker, Name, or Sector..." class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600 transition">
+                    </div>
+                    
+                    <!-- Category dropdown -->
+                    <div>
+                        <select id="filter-category" onchange="filterData()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 transition">
+                            <option value="All">All Framework Categories</option>
+                            <option value="Enablers">1. Enablers</option>
+                            <option value="Users">2. Users</option>
+                            <option value="Emerging Winners">3. Emerging Winners</option>
+                            <option value="Insulated">4. Insulated</option>
+                            <option value="Casualties">5. Casualties ("Walking Dead")</option>
+                        </select>
+                    </div>
+
+                    <!-- Index select -->
+                    <div>
+                        <select id="filter-index" onchange="filterData()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 transition">
+                            <option value="All">All Indexes (S&P 500 & NASDAQ)</option>
+                            <option value="SP500">S&P 500 Components</option>
+                            <option value="NASDAQ">NASDAQ-100 Components</option>
+                            <option value="Dual">Overlapping Components</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Stats summary bar -->
+                <div class="mt-4 pt-4 border-t border-slate-800 flex flex-wrap justify-between items-center text-xs text-slate-400 gap-2">
+                    <div class="flex gap-4">
+                        <span>Showing <strong id="visible-count" class="text-white">0</strong> of <strong id="total-count" class="text-white">0</strong> analyzed index assets</span>
+                        <span class="hidden md:inline">|</span>
+                        <span class="hidden md:inline"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Underwriting Focus: Value Discipline & Capital Cycles</span>
+                    </div>
+                    <button onclick="clearFilters()" class="text-blue-400 hover:text-blue-300 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filters</button>
+                </div>
+            </div>
+
+            <!-- Main Table Grid -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                                <th class="p-4 pl-6">Company</th>
+                                <th class="p-4">Sector</th>
+                                <th class="p-4">Index</th>
+                                <th class="p-4">Davis AI Category</th>
+                                <th class="p-4">Strategic Moat / Vulnerability</th>
+                                <th class="p-4 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="equity-table-body" class="divide-y divide-slate-800/50 text-sm">
+                            <!-- Dynamic Content Inserted Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Index Risk Simulator -->
+        <div id="section-simulator" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left panel: Visual charts -->
+                <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-1">Index Capital Allocation & Concentration Risks</h2>
+                        <p class="text-xs text-slate-400 mb-6">Passive indexes bundle these categories blindly by market cap. See where your capital actually lands.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center justify-center my-4">
+                        <div class="space-y-2">
+                            <h3 class="text-sm font-semibold text-center text-slate-300">S&P 500 AI Profile</h3>
+                            <div class="w-full max-w-[240px] mx-auto">
+                                <canvas id="chart-sp500"></canvas>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <h3 class="text-sm font-semibold text-center text-slate-300">NASDAQ-100 AI Profile</h3>
+                            <div class="w-full max-w-[240px] mx-auto">
+                                <canvas id="chart-nasdaq"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-800 pt-4 mt-6">
+                        <div class="flex gap-4 text-xs text-slate-400 justify-center">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Enablers</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Users</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Emerging</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-500"></span> Insulated</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Casualties</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right panel: Interactive exposure checker -->
+                <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-1">Portfolio Risk Diagnostics</h2>
+                        <p class="text-xs text-slate-400 mb-4">Under Davis Advisors' criteria, passive exposure currently overweights capital-heavy enablers at cyclical peaks while carrying structural casualties at value prices.</p>
+                        
+                        <!-- Mini Ticker Scan Tool -->
+                        <div class="space-y-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Simulate Portfolio Risk Shift</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[11px] text-slate-400 block mb-1">S&P 500 Index Allocation (%)</label>
+                                    <input type="range" id="slider-sp" min="0" max="100" value="50" oninput="calculateCustomPortfolio()" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                                    <div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>0%</span><span id="label-sp" class="text-blue-400 font-bold">50%</span><span>100%</span></div>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] text-slate-400 block mb-1">NASDAQ-100 Index Allocation (%)</label>
+                                    <input type="range" id="slider-nas" min="0" max="100" value="30" oninput="calculateCustomPortfolio()" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                                    <div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>0%</span><span id="label-nas" class="text-blue-400 font-bold">30%</span><span>100%</span></div>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] text-slate-400 block mb-1">Active / Davis Selection Allocation (%)</label>
+                                    <input type="range" id="slider-active" min="0" max="100" value="20" oninput="calculateCustomPortfolio()" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                                    <div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>0%</span><span id="label-active" class="text-blue-400 font-bold">20%</span><span>100%</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Computed Portfolio output details -->
+                    <div class="mt-6 pt-4 border-t border-slate-800 space-y-3">
+                        <h4 class="text-xs font-semibold text-slate-300">Composite Portfolio Risk Warning:</h4>
+                        <div id="risk-score-badge" class="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-xl text-xs">
+                            <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                            <div>
+                                <span class="font-bold block">Highly Vulnerable Capex Exposure</span>
+                                <span class="text-slate-400">Over 38% allocated to Enablers prone to eventual down-cycles.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Davis Thesis Coach -->
+        <div id="section-theory" class="hidden">
+            <div class="max-w-4xl mx-auto space-y-8">
+                <div class="text-center space-y-2">
+                    <span class="text-xs text-blue-400 font-bold tracking-widest uppercase">Underwriting Discipline in the AI Age</span>
+                    <h2 class="text-3xl font-extrabold tracking-tight">Chris Davis's Chairman's Desk Principles</h2>
+                    <p class="text-slate-400 max-w-2xl mx-auto">"Technology shifts are constant, but the laws of microeconomics, return on invested capital (ROIC), and capital destruction are immutable."</p>
+                </div>
+
+                <!-- Three pillars of the Thesis -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                            <i class="fa-solid fa-hourglass-half text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-lg">Amara's Law</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">We tend to overestimate the effect of a technology in the short run and underestimate the effect in the long run. In the short run, valuations of "Enablers" expand speculatively; in the long run, "Users" capture structural savings.</p>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-600/20 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                            <i class="fa-solid fa-arrows-spin text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-lg">Capital Cycle Theory</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">High returns on capital attract massive capital expenditures. As overinvestment occurs, commoditization begins, leading to severe down-cycles. Picking enablers at the peak of their pricing power is historically hazardous.</p>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-400 border border-purple-500/20">
+                            <i class="fa-solid fa-database text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-lg">The Proprietary Data Moat</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">True users/winners are not pure software companies, but legacy firms with vast, closed-loop customer datasets (e.g., healthcare histories, transaction streams) that cannot be parsed by public search crawlers.</p>
+                    </div>
+                </div>
+
+                <!-- Deep Dive Explainer Box -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                    <h3 class="font-bold text-xl flex items-center gap-2"><i class="fa-solid fa-circle-info text-blue-400"></i> Critical S&P/NASDAQ Implementation Takeaways</h3>
+                    <div class="prose prose-invert text-sm text-slate-400 space-y-3 leading-relaxed">
+                        <p>
+                            Historically, major technological paradigm shifts—from railroads to the telegraph, and from the internet to smart mobile systems—rarely enrich the first-wave enablers long-term to the scale of early speculation. The ultimate winners are typically established firms that capture the productivity windfall.
+                        </p>
+                        <p>
+                            <strong>The Passive Index Trap:</strong> Currently, the top-tier of the S&P 500 and the tech-heavy NASDAQ-100 are extremely concentrated in Category 1 ("The Enablers"). If the capital expenditures of hyper-scalers peak or experience downward revisions as they struggle to demonstrate immediate customer ROI, this index structure exposes passive investors to capital down-cycles.
+                        </p>
+                        <p>
+                            <strong>Value Allocation Target:</strong> The sweet spot for active stock selection lies in identifying Category 2 ("The Users"). These are low-risk, cash-flowing companies trading at modest P/E multiples that can embed AI into their workflows to expand their operating margins without suffering massive competitive disruption.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Detailed Analysis Slide-over Panel (Modal) -->
+    <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex justify-end transition-all">
+        <div class="w-full max-w-xl bg-slate-900 border-l border-slate-800 h-full p-6 flex flex-col justify-between shadow-2xl overflow-y-auto custom-scrollbar">
+            <div>
+                <!-- Modal Header -->
+                <div class="flex justify-between items-start pb-4 border-b border-slate-800 mb-6">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span id="modal-ticker" class="bg-blue-900/40 border border-blue-500/30 text-blue-400 text-xs font-bold px-2 py-0.5 rounded">NVDA</span>
+                            <span id="modal-index" class="text-slate-500 text-xs font-medium">S&P 500 / NASDAQ</span>
+                        </div>
+                        <h3 id="modal-name" class="text-2xl font-bold">NVIDIA Corporation</h3>
+                        <p id="modal-sector" class="text-xs text-slate-400 mt-1">Information Technology | Semiconductors</p>
+                    </div>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Content Panels -->
+                <div class="space-y-6 text-sm">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Davis AI Classification</span>
+                        <div id="modal-badge-container">
+                            <!-- Dynamic badge injected here -->
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Strategic AI Moat / Vulnerability</span>
+                        <p id="modal-moat" class="text-slate-200 bg-slate-950 p-4 rounded-xl border border-slate-800 leading-relaxed">
+                            Complete dominance in GPUs and CUDA developer platform ecosystem. Massive supply bottleneck driver.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Davis Framework Analysis & Investment Thesis</span>
+                        <div id="modal-thesis" class="text-slate-300 leading-relaxed space-y-3 bg-slate-950/30 p-4 rounded-xl border border-slate-800">
+                            <!-- Detailed narrative analysis -->
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-950/50 border border-slate-800 p-3 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1">Capital Cycle Risk</span>
+                            <div class="flex items-center gap-1.5 font-bold" id="modal-risk-level">
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span> High
+                            </div>
+                        </div>
+                        <div class="bg-slate-950/50 border border-slate-800 p-3 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1">Davis Recommendation</span>
+                            <div class="font-bold text-white" id="modal-action">
+                                Hold / Monitor Capex
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="pt-6 border-t border-slate-800 mt-8 flex justify-end">
+                <button onclick="closeModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-medium transition text-xs">Close Details</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data & Interactive Logic Script -->
+    <script>
+        // Pre-classified Equity Database of S&P 500 and NASDAQ-100 components under the Davis Funds Framework
+        const indexDatabase = [
+            // 1. Enablers
+            {
+                ticker: "NVDA",
+                name: "NVIDIA Corporation",
+                sector: "Information Technology",
+                index: "Dual",
+                category: "Enablers",
+                moat: "Complete dominance in hardware (GPUs) and software ecosystem (CUDA API).",
+                thesis: "A classic, high-purity 'Enabler.' NVIDIA represents the prime pick-and-shovel provider experiencing astronomical near-to-mid term pricing power. However, under Davis capital cycle logic, overinvestments historically generate commoditization. Current valuations assume permanent structural pricing advantages, making it prone to eventual cyclical supply adjustments.",
+                risk: "High Cyclicality Risk",
+                action: "Cautious Weighting / Trim at Cycle Peaks"
+            },
+            {
+                ticker: "ASML",
+                name: "ASML Holding N.V.",
+                sector: "Information Technology",
+                index: "NASDAQ",
+                category: "Enablers",
+                moat: "Exclusive monopoly on Extreme Ultraviolet (EUV) lithography machines.",
+                thesis: "Crucial 'Enabler' that sits further back in the supply chain than GPU designers. Without ASML machines, TSMC cannot fabricate advanced logic chips. This creates a superior data/hardware moat with inelastic demand that remains buffered even during sudden GPU design downshifts.",
+                risk: "Low-to-Medium Risk",
+                action: "Core Structural Hold"
+            },
+            {
+                ticker: "MSFT",
+                name: "Microsoft Corporation",
+                sector: "Information Technology",
+                index: "Dual",
+                category: "Enablers",
+                moat: "Dominant hybrid presence as Azure Cloud Host + Office Copilot integrator.",
+                thesis: "Acts as a primary dual-category stock but primarily operates as an 'Enabler' due to massive cloud infrastructure services leased to AI development companies. This massive capital cycle is insulated because MSFT owns the direct-to-consumer software layers to monetize backend capital projects safely.",
+                risk: "Low Risk",
+                action: "Core Compounder"
+            },
+            {
+                ticker: "AMZN",
+                name: "Amazon.com, Inc.",
+                sector: "Consumer Discretionary",
+                index: "Dual",
+                category: "Enablers",
+                moat: "AWS hyperscale footprint and massive proprietary logistics data.",
+                thesis: "AWS serves as the digital foundation for a massive percentage of early AI research. Highly resilient because if start-ups fail, Amazon continues to generate high recurring host revenue during the training phase. At the same time, Amazon acts as an internal 'User' optimizing supply networks and automated warehouses.",
+                risk: "Low Risk",
+                action: "Core Compounder"
+            },
+            {
+                ticker: "GOOGL",
+                name: "Alphabet Inc.",
+                sector: "Communication Services",
+                index: "Dual",
+                category: "Enablers",
+                moat: "Google Cloud hosting, TPUs, and absolute search advertising monopoly.",
+                thesis: "Alphabet hosts the largest consumer database on earth. In addition to being an 'Enabler' via Google Cloud infrastructure, they own an insurmountable data flywheel with YouTube, Search, and Android. Although they face minor front-end chat queries competition, their foundational infra is structurally safe.",
+                risk: "Low Risk",
+                action: "Highly Attractive Valuation"
+            },
+            {
+                ticker: "AVGO",
+                name: "Broadcom Inc.",
+                sector: "Information Technology",
+                index: "Dual",
+                category: "Enablers",
+                moat: "Custom silicon design (ASICs) and dominant network switching infrastructure.",
+                thesis: "A premium 'Enabler' providing the critical communication layers between high-speed GPU clusters inside datacenter fabrics. Highly defensive because Broadcom relies heavily on custom ASIC chips for hyperscale clients, protecting them from generic GPU cyclicality.",
+                risk: "Medium Risk",
+                action: "Core Structural Position"
+            },
+            {
+                ticker: "VRT",
+                name: "Vertiv Holdings Co",
+                sector: "Industrials",
+                index: "SP500",
+                category: "Enablers",
+                moat: "Liquid cooling and power management systems tailored for dense AI racks.",
+                thesis: "The physical enabler of AI. Next-generation AI chips consume double the power of legacy processors, and heat dissipation is a non-negotiable roadblock. Vertiv is highly favored in the Davis framework because its physical infrastructure products face low risk of software substitution and high tailwind volumes.",
+                risk: "Medium Risk",
+                action: "Structural Growth Play"
+            },
+            {
+                ticker: "ETN",
+                name: "Eaton Corporation plc",
+                sector: "Industrials",
+                index: "SP500",
+                category: "Enablers",
+                moat: "Electrical grid equipment, transformers, and power distribution setups.",
+                thesis: "The power infrastructure gatekeeper. No AI data center can run without custom substation installations, transformers, and distribution gear. Eaton operates in a regulated, high-barrier industry that cannot be quickly commoditized by virtual technologies, fitting the physical-enabler sweet spot.",
+                risk: "Low Risk",
+                action: "Defensive Structural Compounder"
+            },
+
+            // 2. Users
+            {
+                ticker: "JPM",
+                name: "JPMorgan Chase & Co.",
+                sector: "Financials",
+                index: "SP500",
+                category: "Users",
+                moat: "Immense balance sheet, trillions of closed transaction records, client lock-in.",
+                thesis: "A classic, textbook 'User'. JPMorgan possesses proprietary financial data pools that public internet crawlers can never access. They are deploying automated underwriting systems to streamline loan approvals, detect real-time payment fraud, and reduce middle-office operational costs directly boosting net profit margins.",
+                risk: "Low Risk",
+                action: "Premium Core Holding"
+            },
+            {
+                ticker: "COF",
+                name: "Capital One Financial Corporation",
+                sector: "Financials",
+                index: "SP500",
+                category: "Users",
+                moat: "A decade of custom cloud database migration and real-time consumer risk underwriting.",
+                thesis: "A favored stock in Davis portfolios. Capital One has rebuilt its complete tech stack from the ground up on modern databases. AI deployment allows them to run real-time credit underwriting models on high-frequency transactions, generating superior loss-ratios and operating efficiency compared to regional competitors.",
+                risk: "Low Risk",
+                action: "Strong Value Selection"
+            },
+            {
+                ticker: "UNH",
+                name: "UnitedHealth Group Incorporated",
+                sector: "Healthcare",
+                index: "SP500",
+                category: "Users",
+                moat: "Longitudinal health records of over 100M+ members via Optum platform.",
+                thesis: "As the ultimate medical 'User', UnitedHealth operates with an incredibly valuable, closed-loop database. By applying localized LLMs and analytical neural nets, they can automate claims processing workflows, preemptively flag patient clinical risks, and significantly lower operating ratios without compromising patient privacy.",
+                risk: "Low Risk",
+                action: "Highly Resilient Compounder"
+            },
+            {
+                ticker: "V",
+                name: "Visa Inc.",
+                sector: "Financials",
+                index: "Dual",
+                category: "Users",
+                moat: "Bilateral payment networks spanning billions of consumers and merchants.",
+                thesis: "Visa is utilizing machine-learning frameworks to parse thousands of payments per second for fraud and compliance. AI reduces cost-to-serve and limits transaction failure, letting Visa capture high-margin network fees with expanding operating scale and minimum new hardware capex requirements.",
+                risk: "Low Risk",
+                action: "Core Compounder"
+            },
+            {
+                ticker: "CRM",
+                name: "Salesforce, Inc.",
+                sector: "Information Technology",
+                index: "Dual",
+                category: "Users",
+                moat: "High customer switching costs via core enterprise CRM data.",
+                thesis: "Salesforce is transitionary, acting as a curator. Rather than paying high hardware costs to develop models, they integrate external AI agents into their existing database architecture. This enables their corporate clients to run custom pipelines, letting Salesforce charge premium seat fees without taking the capex model-training risk.",
+                risk: "Medium Risk",
+                action: "Selective Tech Buy"
+            },
+            {
+                ticker: "PGR",
+                name: "The Progressive Corporation",
+                sector: "Financials",
+                index: "SP500",
+                category: "Users",
+                moat: "Telematics telemetry data and advanced, rapid underwriting models.",
+                thesis: "Progressive dominates auto-insurance because of proprietary driver datasets. Using machine learning on driving behavior allows them to price insurance risk with unmatched accuracy. This creates a structural moat where low-risk drivers migrate to Progressive, and higher-risk pools are systematically priced out.",
+                risk: "Low Risk",
+                action: "High Quality User"
+            },
+
+            // 3. Emerging Winners
+            {
+                ticker: "PLTR",
+                name: "Palantir Technologies Inc.",
+                sector: "Information Technology",
+                index: "Dual",
+                category: "Emerging Winners",
+                moat: "Proprietary software integration (AIP, Foundry) with deep government trust.",
+                thesis: "An pure-play enterprise 'Emerging Winner'. Palantir designs software frameworks that help institutions connect large models to operational data. Highly successful, but high valuation multiples imply perfect execution. Under Davis guidelines, vigilance is required to ensure stock options dilution does not consume structural net-profit gains.",
+                risk: "High Valuation Risk",
+                action: "Hold / Monitor Value"
+            },
+            {
+                ticker: "TSLA",
+                name: "Tesla, Inc.",
+                sector: "Consumer Discretionary",
+                index: "Dual",
+                category: "Emerging Winners",
+                moat: "Billions of real-world driving miles data, proprietary compute clusters.",
+                thesis: "A complex, high-volatility hybrid. Under an AI lens, Tesla is a hardware/software robotics pure-play focusing on full-self driving systems. While the data flywheel is unmatched, the ultimate cash flow realization remains speculative and subject to heavy structural capital costs and intensive competition.",
+                risk: "Very High Risk",
+                action: "Monitor Capex & Regulatory Shifts"
+            },
+            {
+                ticker: "SNOW",
+                name: "Snowflake Inc.",
+                sector: "Information Technology",
+                index: "NASDAQ",
+                category: "Emerging Winners",
+                moat: "Flexible multi-cloud data warehousing and sharing architecture.",
+                thesis: "Enables companies to aggregate and cleanse structureless data before feeding it into models. While crucial, Snowflake faces massive competition from hyperscale database providers (Databricks, Google BigQuery), rendering their pricing power somewhat unproven relative to their high multiple.",
+                risk: "High Risk",
+                action: "Avoid / Watch Margins"
+            },
+
+            // 4. Insulated
+            {
+                ticker: "COST",
+                name: "Costco Wholesale Corporation",
+                sector: "Consumer Staples",
+                index: "Dual",
+                category: "Insulated",
+                moat: "Extreme low-price membership scale and bricks-and-mortar footprint.",
+                thesis: "Highly 'Insulated'. AI can optimize Costco's back-office supply routes or pricing algorithms, but consumers do not visit physical warehouses to interact with chatbots. The core membership value, brick-and-mortar scale, and ultra-cheap private label goods are completely immune to virtual disruption.",
+                risk: "Ultra-Low Risk",
+                action: "Core Defensive Hold"
+            },
+            {
+                ticker: "WM",
+                name: "Waste Management, Inc.",
+                sector: "Industrials",
+                index: "SP500",
+                category: "Insulated",
+                moat: "Permitted landfills, capital-intensive physical collection assets.",
+                thesis: "The ultimate offline moat. No software program, LLM, or AI automation can clean a physical location or process heavy industrial trash. Waste Management's cash flows are linked to real-world infrastructure and demographics, making it an excellent defensive hedge against high-tech speculation cycles.",
+                risk: "Minimal Risk",
+                action: "Defensive Anchor"
+            },
+            {
+                ticker: "KO",
+                name: "The Coca-Cola Company",
+                sector: "Consumer Staples",
+                index: "SP500",
+                category: "Insulated",
+                moat: "Unmatched global brand index, distribution networks, physical bottling assets.",
+                thesis: "Physical consumer demand is decoupled from digital disruption. Consumers buy Coca-Cola for physical refreshment and brand loyalty. While marketing production costs might decline through AI generation, the core economic engine of syrup manufacturing is safe from digital replication.",
+                risk: "Minimal Risk",
+                action: "Income / Value Anchor"
+            },
+            {
+                ticker: "PEP",
+                name: "PepsiCo, Inc.",
+                sector: "Consumer Staples",
+                index: "Dual",
+                category: "Insulated",
+                moat: "Direct-Store-Delivery network, global snacks and beverages scale.",
+                thesis: "Similar to Coca-Cola, PepsiCo's shelf-space dominance and supply routing constitute a durable, offline moat. No virtual agent can replace physical snacks. The business stands to benefit margins through administrative automation while retaining absolute product lock-in.",
+                risk: "Minimal Risk",
+                action: "Income / Value Anchor"
+            },
+            {
+                ticker: "NEE",
+                name: "NextEra Energy, Inc.",
+                sector: "Utilities",
+                index: "SP500",
+                category: "Insulated",
+                moat: "Monopoly electric utility status in high-growth Florida region, renewable scale.",
+                thesis: "The physical utility backbone. Ironically, NextEra benefits directly from AI expansion because data centers require immense, carbon-neutral electricity. While their utility business is insulated from tech disruption, their development arm captures structural power demands.",
+                risk: "Low Risk",
+                action: "Defensive Play with Secular Tailwind"
+            },
+
+            // 5. Casualties ("Walking Dead")
+            {
+                ticker: "CHGG",
+                name: "Chegg, Inc.",
+                sector: "Consumer Discretionary",
+                index: "SP500",
+                category: "Casualties",
+                moat: "Weakened - historically driven by proprietary, structured homework solutions database.",
+                thesis: "A textbook example of the 'Walking Dead' or Casualties. Chegg's previous model was charging students a subscription fee to search a curated index of textbook answers. With advanced models generating accurate, step-by-step logic explanations for free, their core subscription value proposition is permanently compromised.",
+                risk: "Extremely High Risk",
+                action: "Avoid Completely"
+            },
+            {
+                ticker: "EXPE",
+                name: "Expedia Group, Inc.",
+                sector: "Consumer Discretionary",
+                index: "NASDAQ",
+                category: "Casualties",
+                moat: "Weakened - based on transaction pricing aggregation and user interface.",
+                thesis: "Vulnerable to agentic digital disintermediation. When users can ask highly personalized AI travel agents to book flight, hotel, and car itineraries directly using custom logic, simple middleman booking aggregators face extreme risk of being bypassed or suffering severe margin erosion.",
+                risk: "High Vulnerability",
+                action: "Underweight / Avoid"
+            },
+            {
+                ticker: "CTSH",
+                name: "Cognizant Technology Solutions Corporation",
+                sector: "Information Technology",
+                index: "NASDAQ",
+                category: "Casualties",
+                moat: "Information technology outsource labor and system integration services.",
+                thesis: "At Risk under the Davis framework. Mid-tier IT offshore providers generate revenue by renting junior engineering hours for basic application maintenance, system integration, and code migration. As code-generation platforms automate simple scripting tasks, client budgets face significant downward pricing renegotiations.",
+                risk: "Medium-to-High Risk",
+                action: "Avoid / Watch Operating Margins"
+            }
+        ];
+
+        // Active State
+        let filteredDatabase = [...indexDatabase];
+        let activeTab = 'analyzer';
+        let chartSP500Instance = null;
+        let chartNasdaqInstance = null;
+
+        // On document load
+        window.onload = function() {
+            renderTable();
+            initCharts();
+            calculateCustomPortfolio();
+        };
+
+        // Switch Tabs Functionality
+        function switchTab(tabName) {
+            activeTab = tabName;
+            
+            // Manage UI classes for buttons
+            const tabs = ['analyzer', 'simulator', 'theory'];
+            tabs.forEach(t => {
+                const button = document.getElementById(`tab-${t}`);
+                if (t === tabName) {
+                    button.classList.add('bg-blue-600', 'text-white', 'shadow');
+                    button.classList.remove('text-slate-400', 'hover:text-white');
+                    document.getElementById(`section-${t}`).classList.remove('hidden');
+                } else {
+                    button.classList.remove('bg-blue-600', 'text-white', 'shadow');
+                    button.classList.add('text-slate-400', 'hover:text-white');
+                    document.getElementById(`section-${t}`).classList.add('hidden');
+                }
+            });
+        }
+
+        // Render Table Data
+        function renderTable() {
+            const tableBody = document.getElementById('equity-table-body');
+            tableBody.innerHTML = '';
+            
+            document.getElementById('visible-count').innerText = filteredDatabase.length;
+            document.getElementById('total-count').innerText = indexDatabase.length;
+
+            if (filteredDatabase.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-3 block"></i>
+                            No companies match your current search criteria.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filteredDatabase.forEach(company => {
+                let badgeClass = '';
+                switch(company.category) {
+                    case 'Enablers': badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'; break;
+                    case 'Users': badgeClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20'; break;
+                    case 'Emerging Winners': badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/20'; break;
+                    case 'Insulated': badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20'; break;
+                    case 'Casualties': badgeClass = 'bg-red-500/10 text-red-400 border-red-500/20'; break;
+                }
+
+                let indexBadge = '';
+                if(company.index === 'Dual') {
+                    indexBadge = `<span class="bg-indigo-950/40 text-indigo-400 text-[10px] px-2 py-0.5 rounded border border-indigo-500/20">S&P 500 / NASDAQ</span>`;
+                } else if(company.index === 'SP500') {
+                    indexBadge = `<span class="bg-blue-950/40 text-blue-400 text-[10px] px-2 py-0.5 rounded border border-blue-500/20">S&P 500</span>`;
+                } else {
+                    indexBadge = `<span class="bg-purple-950/40 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/20">NASDAQ-100</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/30 transition-all cursor-pointer";
+                tr.onclick = (e) => {
+                    // Prevent row click firing if clicking on the view button itself
+                    openModal(company);
+                };
+
+                tr.innerHTML = `
+                    <td class="p-4 pl-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-slate-200">
+                                ${company.ticker}
+                            </div>
+                            <div>
+                                <span class="font-semibold text-slate-100 block">${company.name}</span>
+                                <span class="text-[11px] text-slate-400">${company.ticker}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-4 text-slate-300 font-medium">${company.sector}</td>
+                    <td class="p-4">${indexBadge}</td>
+                    <td class="p-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            ${company.category === 'Casualties' ? 'Casualties (Walking Dead)' : company.category}
+                        </span>
+                    </td>
+                    <td class="p-4">
+                        <p class="text-xs text-slate-400 max-w-sm truncate" title="${company.moat}">${company.moat}</p>
+                    </td>
+                    <td class="p-4 text-center">
+                        <button class="text-blue-400 hover:text-white hover:bg-blue-600/20 p-2 rounded-lg transition-all" onclick="event.stopPropagation(); openModal(${JSON.stringify(company).replace(/"/g, '&quot;')})">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Analyze
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Search and Filter Functions
+        function filterData() {
+            const searchQuery = document.getElementById('search-bar').value.toLowerCase();
+            const categoryFilter = document.getElementById('filter-category').value;
+            const indexFilter = document.getElementById('filter-index').value;
+
+            filteredDatabase = indexDatabase.filter(company => {
+                const matchesSearch = company.name.toLowerCase().includes(searchQuery) || 
+                                      company.ticker.toLowerCase().includes(searchQuery) ||
+                                      company.sector.toLowerCase().includes(searchQuery);
+                
+                const matchesCategory = (categoryFilter === "All") || (company.category === categoryFilter);
+                
+                let matchesIndex = true;
+                if (indexFilter !== "All") {
+                    if (indexFilter === "Dual") {
+                        matchesIndex = (company.index === "Dual");
+                    } else if (indexFilter === "SP500") {
+                        matchesIndex = (company.index === "SP500" || company.index === "Dual");
+                    } else if (indexFilter === "NASDAQ") {
+                        matchesIndex = (company.index === "NASDAQ" || company.index === "Dual");
+                    }
+                }
+
+                return matchesSearch && matchesCategory && matchesIndex;
+            });
+
+            renderTable();
+        }
+
+        function filterByCategory(cat) {
+            document.getElementById('filter-category').value = cat;
+            filterData();
+        }
+
+        function clearFilters() {
+            document.getElementById('search-bar').value = '';
+            document.getElementById('filter-category').value = 'All';
+            document.getElementById('filter-index').value = 'All';
+            filteredDatabase = [...indexDatabase];
+            renderTable();
+        }
+
+        // Modal Controls
+        function openModal(company) {
+            document.getElementById('modal-ticker').innerText = company.ticker;
+            document.getElementById('modal-name').innerText = company.name;
+            document.getElementById('modal-sector').innerText = `${company.sector} | ${company.index === 'Dual' ? 'S&P 500 / NASDAQ' : company.index === 'SP500' ? 'S&P 500' : 'NASDAQ-100'}`;
+            document.getElementById('modal-moat').innerText = company.moat;
+            document.getElementById('modal-thesis').innerText = company.thesis;
+            document.getElementById('modal-action').innerText = company.action;
+            
+            const riskContainer = document.getElementById('modal-risk-level');
+            let riskColor = 'bg-emerald-500';
+            if (company.risk.includes('High') || company.risk.includes('Vulnerability')) {
+                riskColor = 'bg-red-500';
+            } else if (company.risk.includes('Medium')) {
+                riskColor = 'bg-yellow-500';
+            }
+            riskContainer.innerHTML = `<span class="w-2.5 h-2.5 rounded-full ${riskColor}"></span> ${company.risk}`;
+
+            const badgeContainer = document.getElementById('modal-badge-container');
+            let badgeClass = '';
+            switch(company.category) {
+                case 'Enablers': badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'; break;
+                case 'Users': badgeClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20'; break;
+                case 'Emerging Winners': badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/20'; break;
+                case 'Insulated': badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20'; break;
+                case 'Casualties': badgeClass = 'bg-red-500/10 text-red-400 border-red-500/20'; break;
+            }
+            badgeContainer.innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${badgeClass}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                    ${company.category === 'Casualties' ? 'Casualties ("The Walking Dead")' : company.category}
+                </span>
+            `;
+
+            const modal = document.getElementById('detail-modal');
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+        }
+
+        // Tab 2: Chart Initializations
+        function initCharts() {
+            // S&P 500 Estimate breakdown under Davis classification weights
+            const ctxSP = document.getElementById('chart-sp500').getContext('2d');
+            chartSP500Instance = new Chart(ctxSP, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Enablers', 'Users', 'Emerging', 'Insulated', 'Casualties'],
+                    datasets: [{
+                        data: [30, 35, 3, 27, 5],
+                        backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#6B7280', '#EF4444'],
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // NASDAQ-100 high-concentration profile
+            const ctxNas = document.getElementById('chart-nasdaq').getContext('2d');
+            chartNasdaqInstance = new Chart(ctxNas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Enablers', 'Users', 'Emerging', 'Insulated', 'Casualties'],
+                    datasets: [{
+                        data: [55, 25, 12, 6, 2],
+                        backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#6B7280', '#EF4444'],
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Custom Weight Risk Scanner computation
+        function calculateCustomPortfolio() {
+            const spWeight = parseInt(document.getElementById('slider-sp').value);
+            const nasWeight = parseInt(document.getElementById('slider-nas').value);
+            const activeWeight = parseInt(document.getElementById('slider-active').value);
+
+            // Re-normalize to 100%
+            const total = spWeight + nasWeight + activeWeight;
+            if (total === 0) return;
+
+            const spPct = (spWeight / total);
+            const nasPct = (nasWeight / total);
+            const activePct = (activeWeight / total);
+
+            // Update Labels
+            document.getElementById('label-sp').innerText = Math.round(spPct * 100) + '%';
+            document.getElementById('label-nas').innerText = Math.round(nasPct * 100) + '%';
+            document.getElementById('label-active').innerText = Math.round(activePct * 100) + '%';
+
+            // Category breakdown per index
+            // S&P 500 weights: [30, 35, 3, 27, 5]
+            // NASDAQ-100 weights: [55, 25, 12, 6, 2]
+            // Active selection model (Davis biased): [10, 55, 5, 30, 0]
+            const enablerSum = (30 * spPct) + (55 * nasPct) + (10 * activePct);
+            const casualtySum = (5 * spPct) + (2 * nasPct) + (0 * activePct);
+
+            const riskContainer = document.getElementById('risk-score-badge');
+            if (enablerSum > 45) {
+                riskContainer.className = "flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs";
+                riskContainer.innerHTML = `
+                    <i class="fa-solid fa-circle-exclamation text-xl"></i>
+                    <div>
+                        <span class="font-bold block text-sm">Extreme Capital Cycle Warning (${Math.round(enablerSum)}% Enablers)</span>
+                        <span class="text-slate-400">Your portfolio is dangerously overallocated to first-wave enablers. You have severe downside risk during structural cloud and chip spend digestion cycles.</span>
+                    </div>
+                `;
+            } else if (enablerSum > 25) {
+                riskContainer.className = "flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-xl text-xs";
+                riskContainer.innerHTML = `
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    <div>
+                        <span class="font-bold block text-sm">Moderate Cyclicality Exposure (${Math.round(enablerSum)}% Enablers)</span>
+                        <span class="text-slate-400">Balanced, but significantly mirrors passive index concentration. Consider shifting index capital toward high-performing "Users" to hedge cyclical capex peaks.</span>
+                    </div>
+                `;
+            } else {
+                riskContainer.className = "flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs";
+                riskContainer.innerHTML = `
+                    <i class="fa-solid fa-circle-check text-xl"></i>
+                    <div>
+                        <span class="font-bold block text-sm">Defensive Value Underwriting Profile (${Math.round(enablerSum)}% Enablers)</span>
+                        <span class="text-slate-400">Excellent structural protection. High allocation to cash-generating Users and Insulated business assets provides strong structural margin expansion relative to speculative cycles.</span>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
