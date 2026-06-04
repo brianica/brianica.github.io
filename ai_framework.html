@@ -149,6 +149,24 @@
                             <option value="Dual">Overlapping Components</option>
                         </select>
                     </div>
+
+                    <!-- Sector select -->
+                    <div>
+                        <select id="filter-sector" onchange="filterData()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 transition">
+                            <option value="All">All Sectors</option>
+                            <option value="Communication Services">Communication Services</option>
+                            <option value="Consumer Discretionary">Consumer Discretionary</option>
+                            <option value="Consumer Staples">Consumer Staples</option>
+                            <option value="Energy">Energy</option>
+                            <option value="Financials">Financials</option>
+                            <option value="Health Care">Health Care</option>
+                            <option value="Industrials">Industrials</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Materials">Materials</option>
+                            <option value="Real Estate">Real Estate</option>
+                            <option value="Utilities">Utilities</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Stats summary bar -->
@@ -2900,14 +2918,16 @@
             const searchQuery = document.getElementById('search-bar').value.toLowerCase();
             const categoryFilter = document.getElementById('filter-category').value;
             const indexFilter = document.getElementById('filter-index').value;
+            const sectorFilter = document.getElementById('filter-sector').value;
 
             filteredDatabase = indexDatabase.filter(company => {
-                const matchesSearch = company.name.toLowerCase().includes(searchQuery) || 
+                const matchesSearch = company.name.toLowerCase().includes(searchQuery) ||
                                       company.ticker.toLowerCase().includes(searchQuery) ||
                                       company.sector.toLowerCase().includes(searchQuery);
-                
+
                 const matchesCategory = (categoryFilter === "All") || (company.category === categoryFilter);
-                
+                const matchesSector = (sectorFilter === "All") || (company.sector === sectorFilter);
+
                 let matchesIndex = true;
                 if (indexFilter !== "All") {
                     if (indexFilter === "Dual") {
@@ -2919,7 +2939,7 @@
                     }
                 }
 
-                return matchesSearch && matchesCategory && matchesIndex;
+                return matchesSearch && matchesCategory && matchesIndex && matchesSector;
             });
 
             renderTable();
@@ -2934,6 +2954,7 @@
             document.getElementById('search-bar').value = '';
             document.getElementById('filter-category').value = 'All';
             document.getElementById('filter-index').value = 'All';
+            document.getElementById('filter-sector').value = 'All';
             filteredDatabase = [...indexDatabase];
             renderTable();
         }
