@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js for beautiful analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="finance_data.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -2893,11 +2894,10 @@
             });
         }
 
-        // ── Financial data (embedded — run fetch_market_data.py to refresh) ──
-        // FINANCE_DATA_START
-        const FINANCE_AS_OF = null;
-        const financialData = {};
-        // FINANCE_DATA_END
+        // financialData and FINANCE_AS_OF are loaded from finance_data.js
+        // If the file hasn't been generated yet, fall back to empty objects
+        if (typeof financialData === 'undefined')  { var financialData  = {}; }
+        if (typeof FINANCE_AS_OF === 'undefined')  { var FINANCE_AS_OF  = null; }
 
         function fmtMarketCap(n) {
             if (n == null) return '<span class="text-slate-600">--</span>';
