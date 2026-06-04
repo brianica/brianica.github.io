@@ -174,21 +174,9 @@
                     <div class="flex gap-4 items-center">
                         <span>Showing <strong id="visible-count" class="text-white">0</strong> of <strong id="total-count" class="text-white">0</strong> analyzed index assets</span>
                         <span class="hidden md:inline">|</span>
-                        <span id="data-status" class="hidden md:inline text-slate-500 italic">Market data not loaded</span>
+                        <span id="data-status" class="hidden md:inline text-slate-500 italic"></span>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button onclick="clearFilters()" class="text-blue-400 hover:text-blue-300 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filters</button>
-                        <button id="load-data-btn" onclick="loadMarketData()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-chart-bar"></i> Load Market Data
-                        </button>
-                    </div>
-                </div>
-                <!-- Progress bar -->
-                <div id="fetch-progress-wrap" class="hidden mt-2">
-                    <div class="w-full bg-slate-800 rounded-full h-1.5">
-                        <div id="fetch-progress-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div>
-                    </div>
-                    <p id="fetch-progress-label" class="text-[11px] text-slate-500 mt-1"></p>
+                    <button onclick="clearFilters()" class="text-blue-400 hover:text-blue-300 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filters</button>
                 </div>
             </div>
 
@@ -2803,10 +2791,14 @@
 
         // On document load
         window.onload = function() {
-            loadCachedFinanceData();
             renderTable();
             initCharts();
             calculateCustomPortfolio();
+            const asOf = document.getElementById('data-as-of');
+            if (asOf && FINANCE_AS_OF) {
+                document.getElementById('data-status').classList.remove('hidden');
+                document.getElementById('data-status').textContent = 'Market data as of ' + FINANCE_AS_OF;
+            }
         };
 
         // Switch Tabs Functionality
@@ -2915,8 +2907,11 @@
             });
         }
 
-        // ── Financial data helpers ─────────────────────────────────────────
-        let financialData = {};
+        // ── Financial data (embedded — run fetch_market_data.py to refresh) ──
+        // FINANCE_DATA_START
+        const FINANCE_AS_OF = null;
+        const financialData = {};
+        // FINANCE_DATA_END
 
         function fmtMarketCap(n) {
             if (n == null) return '<span class="text-slate-600">--</span>';
@@ -2940,143 +2935,6 @@
         function fmtReturnClass(n) {
             if (n == null) return '';
             return n >= 0 ? 'text-emerald-400' : 'text-red-400';
-        }
-
-        // ── Market data fetch ──────────────────────────────────────────────
-        async function loadMarketData() {
-            const btn = document.getElementById('load-data-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading...';
-            document.getElementById('fetch-progress-wrap').classList.remove('hidden');
-            document.getElementById('data-status').classList.remove('hidden');
-            document.getElementById('data-status').textContent = 'Fetching market data from Yahoo Finance…';
-
-            const tickers = indexDatabase.map(c => c.ticker);
-            const total = tickers.length;
-            let done = 0;
-
-            const setProgress = (n, msg) => {
-                const pct = Math.round((n / total) * 100);
-                document.getElementById('fetch-progress-bar').style.width = pct + '%';
-                document.getElementById('fetch-progress-label').textContent = msg;
-            };
-
-            // Step 1: Batch quotes — market cap, P/E, dividend, 52-week return
-            const quoteBatch = 50;
-            for (let i = 0; i < tickers.length; i += quoteBatch) {
-                const batch = tickers.slice(i, i + quoteBatch);
-                setProgress(done, `Fetching quotes ${i+1}–${Math.min(i+quoteBatch, total)} of ${total}…`);
-                try {
-                    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=marketCap,trailingPE,trailingAnnualDividendYield,fiftyTwoWeekChangePercent,regularMarketChangePercent`;
-                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                    const json = await res.json();
-                    (json?.quoteResponse?.result || []).forEach(q => {
-                        if (!financialData[q.symbol]) financialData[q.symbol] = {};
-                        const fd = financialData[q.symbol];
-                        fd.marketCap = q.marketCap ?? fd.marketCap;
-                        fd.pe        = q.trailingPE ?? fd.pe;
-                        fd.div       = q.trailingAnnualDividendYield ?? fd.div;
-                        fd.return1y  = q.fiftyTwoWeekChangePercent != null
-                                       ? q.fiftyTwoWeekChangePercent / 100
-                                       : fd.return1y;
-                    });
-                } catch(e) { console.warn('Quote fetch error', e); }
-                done += batch.length;
-                await sleep(150);
-            }
-
-            // Step 2: Spark data — YTD, 1Y (confirm), 3Y CAGR, 5Y CAGR
-            const sparkBatch = 20;
-            for (let i = 0; i < tickers.length; i += sparkBatch) {
-                const batch = tickers.slice(i, i + sparkBatch);
-                setProgress(done - tickers.length + i, `Fetching historical data ${i+1}–${Math.min(i+sparkBatch, total)} of ${total}…`);
-                try {
-                    const url = `https://query2.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=5y&interval=3mo`;
-                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                    const json = await res.json();
-                    (json?.spark?.result || []).forEach(s => {
-                        const sym = s.symbol;
-                        const resp = s?.response?.[0];
-                        const closes = resp?.indicators?.adjclose?.[0]?.adjclose;
-                        const timestamps = resp?.timestamp;
-                        if (!closes || closes.length < 2) return;
-                        if (!financialData[sym]) financialData[sym] = {};
-                        const fd = financialData[sym];
-                        const now = closes[closes.length - 1];
-                        const n = closes.length;
-
-                        // YTD: find the last close before Jan 1 of current year
-                        const janFirst = new Date(new Date().getFullYear(), 0, 1).getTime() / 1000;
-                        let ytdBase = null;
-                        for (let j = n - 1; j >= 0; j--) {
-                            if (timestamps[j] < janFirst) { ytdBase = closes[j]; break; }
-                        }
-                        if (ytdBase && ytdBase > 0) fd.ytd = (now - ytdBase) / ytdBase;
-
-                        // 1Y: ~4 quarters back
-                        const p1y = closes[Math.max(0, n - 5)];
-                        if (p1y && p1y > 0) fd.return1y = (now - p1y) / p1y;
-
-                        // 3Y CAGR: ~12 quarters back
-                        const p3y = closes[Math.max(0, n - 13)];
-                        if (p3y && p3y > 0) fd.cagr3y = Math.pow(now / p3y, 1/3) - 1;
-
-                        // 5Y CAGR: earliest data point
-                        const p5y = closes[0];
-                        if (p5y && p5y > 0 && n >= 16) fd.cagr5y = Math.pow(now / p5y, 1/5) - 1;
-                    });
-                } catch(e) { console.warn('Spark fetch error', e); }
-                await sleep(200);
-            }
-
-            // Step 3: ROE from quoteSummary financialData module (batched with delay)
-            setProgress(total, 'Fetching ROE data…');
-            for (let i = 0; i < tickers.length; i++) {
-                if (i % 30 === 0) {
-                    setProgress(i, `Fetching ROE ${i+1}–${Math.min(i+30, total)} of ${total}…`);
-                    await sleep(500);
-                }
-                try {
-                    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${tickers[i]}?modules=financialData`;
-                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                    const json = await res.json();
-                    const roe = json?.quoteSummary?.result?.[0]?.financialData?.returnOnEquity?.raw;
-                    if (roe != null) {
-                        if (!financialData[tickers[i]]) financialData[tickers[i]] = {};
-                        financialData[tickers[i]].roe = roe;
-                    }
-                } catch(e) { /* skip */ }
-                if (i % 5 === 0) await sleep(50);
-            }
-
-            // Save to sessionStorage
-            try {
-                sessionStorage.setItem('davis_finance', JSON.stringify({ data: financialData, ts: Date.now() }));
-            } catch(e) {}
-
-            setProgress(total, `Loaded data for ${Object.keys(financialData).length} companies`);
-            document.getElementById('data-status').textContent = `Market data loaded · ${new Date().toLocaleTimeString()}`;
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> Refresh Data';
-            renderTable();
-        }
-
-        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-        function loadCachedFinanceData() {
-            try {
-                const raw = sessionStorage.getItem('davis_finance');
-                if (!raw) return;
-                const { data, ts } = JSON.parse(raw);
-                if (Date.now() - ts < 4 * 60 * 60 * 1000) { // 4h TTL
-                    financialData = data;
-                    document.getElementById('data-status').classList.remove('hidden');
-                    document.getElementById('data-status').textContent =
-                        `Market data from cache · loaded at ${new Date(ts).toLocaleTimeString()}`;
-                    document.getElementById('load-data-btn').innerHTML =
-                        '<i class="fa-solid fa-rotate mr-1"></i> Refresh Data';
-                }
-            } catch(e) {}
         }
 
         // Search and Filter Functions
