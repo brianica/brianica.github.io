@@ -10,38 +10,29 @@ Requirements:
 Usage:
     python3 fetch_market_data.py
 
-Expected runtime: ~5-10 minutes for all companies.
+Expected runtime: ~10-15 minutes for all companies.
 """
 
 import yfinance as yf
 import json
 import re
-import sys
 import time
 import logging
 from datetime import datetime, date
 
-# Suppress yfinance / urllib noise for delisted tickers
+# Suppress yfinance noise
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 
 HTML_FILE = "ai_framework.html"
 
-# Tickers to skip (delisted, merged, or no longer independent)
-SKIP = {
-    "ANSS",   # Acquired by Synopsys (SNPS) Jan 2025
-    "PBCT",   # Merged into MTB 2022
-    "WLTW",   # Renamed — use WTW instead
-}
+SKIP = {"ANSS", "PBCT", "WLTW"}
 
-# Ticker symbol overrides for yfinance (period → hyphen for BRK.B etc.)
-SYMBOL_MAP = {
-    "BRK.B": "BRK-B",
-    "BF.B":  "BF-B",
-}
+# yfinance uses hyphens, not periods
+SYMBOL_MAP = {"BRK.B": "BRK-B", "BF.B": "BF-B"}
 
 
 def get_tickers_from_html():
-    """Extract tickers directly from the HTML database."""
     with open(HTML_FILE, "r", encoding="utf-8") as f:
         html = f.read()
     tickers = re.findall(r'ticker:\s*"(\w+)"', html)
@@ -53,117 +44,71 @@ def get_tickers_from_html():
     return unique
 
 
-def cagr(start_price, end_price, years):
-    if not start_price or not end_price or start_price <= 0 or end_price <= 0:
+def cagr(p_start, p_end, years):
+    if not p_start or not p_end or p_start <= 0 or p_end <= 0:
         return None
-    return (end_price / start_price) ** (1.0 / years) - 1
+    return round((p_end / p_start) ** (1.0 / years) - 1, 4)
 
 
-def fetch_price_history(tickers, batch_size=50):
-    """Download monthly price history and compute return metrics."""
-    result = {}
+def fetch_history_single(ticker):
+    """Fetch 5yr monthly history for one ticker, return return metrics."""
+    sym = SYMBOL_MAP.get(ticker, ticker)
     today = date.today()
     jan_first = date(today.year, 1, 1)
-    start_date = date(today.year - 5, today.month, today.day)
-    total = len(tickers)
 
-    for i in range(0, total, batch_size):
-        batch = [SYMBOL_MAP.get(t, t) for t in tickers[i:i + batch_size]]
-        orig_batch = tickers[i:i + batch_size]
-        pct = int((i / total) * 100)
-        print(f"  [{pct:3d}%] Price history {i+1}–{min(i+batch_size, total)} of {total}…",
-              end="\r", flush=True)
+    try:
+        t = yf.Ticker(sym)
+        hist = t.history(period="5y", interval="1mo", auto_adjust=True)
+        if hist.empty or len(hist) < 3:
+            return {}
 
-        try:
-            data = yf.download(
-                batch,
-                start=str(start_date),
-                end=str(today),
-                interval="1mo",
-                progress=False,
-                auto_adjust=True,
-                group_by="ticker",
-            )
-        except Exception as e:
-            print(f"\n  Batch error: {e}")
-            time.sleep(2)
-            continue
+        closes = hist["Close"].dropna()
+        price_now = float(closes.iloc[-1])
 
-        for orig, sym in zip(orig_batch, batch):
-            try:
-                closes = (data["Close"] if len(batch) == 1
-                          else data["Close"].get(sym, data["Close"].get(orig)))
-                if closes is None:
-                    continue
-                closes = closes.dropna()
-                if len(closes) < 3:
-                    continue
+        # YTD — last close before Jan 1 this year
+        ytd_base = None
+        for idx in reversed(range(len(closes))):
+            if closes.index[idx].date() < jan_first:
+                ytd_base = float(closes.iloc[idx])
+                break
 
-                price_now = float(closes.iloc[-1])
+        def price_at(years_back):
+            target = date(today.year - years_back, today.month, today.day)
+            candidates = closes[closes.index.date <= target]
+            return float(candidates.iloc[-1]) if len(candidates) > 0 else None
 
-                # YTD — last close before Jan 1
-                ytd_base = None
-                for idx in reversed(range(len(closes))):
-                    if closes.index[idx].date() < jan_first:
-                        ytd_base = float(closes.iloc[idx])
-                        break
+        p1y = price_at(1)
+        p3y = price_at(3)
+        p5y = price_at(5)
 
-                # 1Y, 3Y, 5Y anchor prices
-                def price_at(years_back):
-                    target = date(today.year - years_back, today.month, today.day)
-                    candidates = closes[closes.index.date <= target]
-                    return float(candidates.iloc[-1]) if len(candidates) > 0 else None
-
-                p1y, p3y, p5y = price_at(1), price_at(3), price_at(5)
-
-                entry = {}
-                if ytd_base: entry["ytd"]     = round((price_now - ytd_base) / ytd_base, 4)
-                if p1y:      entry["return1y"] = round((price_now - p1y) / p1y, 4)
-                if p3y:      entry["cagr3y"]   = round(cagr(p3y, price_now, 3), 4)
-                if p5y and len(closes) >= 16:
-                             entry["cagr5y"]   = round(cagr(p5y, price_now, 5), 4)
-                if entry:
-                    result[orig] = entry
-
-            except Exception:
-                pass  # Skip silently; delisted tickers produce errors here
-
-        time.sleep(0.8)
-
-    print(f"  [100%] Price history done. Got data for {len(result)}/{total} tickers.")
-    return result
+        entry = {}
+        if ytd_base:          entry["ytd"]      = round((price_now - ytd_base) / ytd_base, 4)
+        if p1y:               entry["return1y"] = round((price_now - p1y) / p1y, 4)
+        if p3y:               entry["cagr3y"]   = cagr(p3y, price_now, 3)
+        if p5y and len(closes) >= 16:
+                              entry["cagr5y"]   = cagr(p5y, price_now, 5)
+        return entry
+    except Exception:
+        return {}
 
 
-def fetch_fundamentals(tickers):
-    """Fetch market cap, P/E, ROE, dividend yield one ticker at a time."""
-    result = {}
-    total = len(tickers)
-
-    for i, ticker in enumerate(tickers):
-        sym = SYMBOL_MAP.get(ticker, ticker)
-        if i % 25 == 0:
-            pct = int((i / total) * 100)
-            print(f"  [{pct:3d}%] Fundamentals {i+1}/{total}…", end="\r", flush=True)
-        try:
-            info = yf.Ticker(sym).info
-            entry = {}
-            if info.get("marketCap"):          entry["marketCap"] = info["marketCap"]
-            if info.get("trailingPE"):         entry["pe"]        = info["trailingPE"]
-            if info.get("returnOnEquity"):     entry["roe"]       = info["returnOnEquity"]
-            div = info.get("trailingAnnualDividendYield") or info.get("dividendYield")
-            if div and div > 0:                entry["div"]       = div
-            if entry:
-                result[ticker] = entry
-        except Exception:
-            pass  # Skip silently
-        time.sleep(0.12)
-
-    print(f"  [100%] Fundamentals done. Got data for {len(result)}/{total} tickers.  ")
-    return result
+def fetch_fundamentals_single(ticker):
+    """Fetch market cap, P/E, ROE, dividend for one ticker."""
+    sym = SYMBOL_MAP.get(ticker, ticker)
+    try:
+        info = yf.Ticker(sym).info
+        entry = {}
+        if info.get("marketCap"):                    entry["marketCap"] = info["marketCap"]
+        if info.get("trailingPE"):                   entry["pe"]        = round(info["trailingPE"], 2)
+        if info.get("returnOnEquity"):               entry["roe"]       = round(info["returnOnEquity"], 4)
+        div = info.get("trailingAnnualDividendYield") or info.get("dividendYield")
+        if div and div > 0:                          entry["div"]       = round(div, 6)
+        return entry
+    except Exception:
+        return {}
 
 
 def embed_into_html(financial_data, as_of_str):
-    """Replace the FINANCE_DATA_START…FINANCE_DATA_END block in the HTML."""
     with open(HTML_FILE, "r", encoding="utf-8") as f:
         html = f.read()
 
@@ -185,42 +130,55 @@ def embed_into_html(financial_data, as_of_str):
     )
 
     if html_new == html:
-        print("ERROR: FINANCE_DATA_START marker not found in HTML. Was it removed?")
+        print("ERROR: FINANCE_DATA_START marker not found. Did the file change?")
         return False
 
     with open(HTML_FILE, "w", encoding="utf-8") as f:
         f.write(html_new)
 
     kb = len(data_json) / 1024
-    print(f"\nEmbedded {len(clean)} tickers ({kb:.0f} KB) into {HTML_FILE}")
+    print(f"Embedded {len(clean)} tickers ({kb:.0f} KB) into {HTML_FILE}")
     return True
 
 
 def main():
     tickers = get_tickers_from_html()
+    total = len(tickers)
     print(f"Davis Fund AI Framework — Market Data Fetcher")
-    print(f"Found {len(tickers)} tickers in database (skipping: {', '.join(SKIP)})\n")
+    print(f"Fetching data for {total} tickers\n")
 
-    print("Step 1/2  — Price history (YTD, 1Y, 3Y CAGR, 5Y CAGR)")
-    price_data = fetch_price_history(tickers)
-
-    print("\nStep 2/2  — Fundamentals (Market Cap, P/E, ROE, Dividend %)")
-    fund_data = fetch_fundamentals(tickers)
-
-    # Merge both datasets
     merged = {}
-    for t in tickers:
+    failed = []
+
+    for i, ticker in enumerate(tickers):
+        pct = int((i / total) * 100)
+        print(f"  [{pct:3d}%] {ticker:<8}", end="\r", flush=True)
+
         fd = {}
-        fd.update(price_data.get(t, {}))
-        fd.update(fund_data.get(t, {}))   # fundamentals win on overlap
+        fd.update(fetch_history_single(ticker))
+        fd.update(fetch_fundamentals_single(ticker))
+
         if fd:
-            merged[t] = fd
+            merged[ticker] = fd
+        else:
+            failed.append(ticker)
+
+        # polite rate limiting
+        time.sleep(0.4)
+
+    print(f"\n  [100%] Done.                              ")
+    print(f"\nResults: {len(merged)} tickers with data, {len(failed)} failed/skipped")
+    if failed:
+        print(f"Failed: {', '.join(failed[:20])}{'…' if len(failed)>20 else ''}")
 
     as_of = datetime.today().strftime("%B %d, %Y")
-    print(f"\nEmbedding data as of {as_of}…")
+    print(f"\nWriting data as of {as_of} to {HTML_FILE}…")
+
     if embed_into_html(merged, as_of):
-        print(f"\n✓ Done! {len(merged)}/{len(tickers)} tickers populated.")
-        print("  Next: git add ai_framework.html && git commit -m 'Refresh market data' && git push")
+        print(f"\nDone! Now run:")
+        print(f"  git add ai_framework.html")
+        print(f"  git commit -m 'Market data {as_of}'")
+        print(f"  git push")
 
 
 if __name__ == "__main__":
