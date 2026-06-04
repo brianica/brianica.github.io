@@ -2781,8 +2781,7 @@
             renderTable();
             initCharts();
             calculateCustomPortfolio();
-            const asOf = document.getElementById('data-as-of');
-            if (asOf && FINANCE_AS_OF) {
+            if (FINANCE_AS_OF) {
                 document.getElementById('data-status').classList.remove('hidden');
                 document.getElementById('data-status').textContent = 'Market data as of ' + FINANCE_AS_OF;
             }
