@@ -171,27 +171,47 @@
 
                 <!-- Stats summary bar -->
                 <div class="mt-4 pt-4 border-t border-slate-800 flex flex-wrap justify-between items-center text-xs text-slate-400 gap-2">
-                    <div class="flex gap-4">
+                    <div class="flex gap-4 items-center">
                         <span>Showing <strong id="visible-count" class="text-white">0</strong> of <strong id="total-count" class="text-white">0</strong> analyzed index assets</span>
                         <span class="hidden md:inline">|</span>
-                        <span class="hidden md:inline"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Underwriting Focus: Value Discipline & Capital Cycles</span>
+                        <span id="data-status" class="hidden md:inline text-slate-500 italic">Market data not loaded</span>
                     </div>
-                    <button onclick="clearFilters()" class="text-blue-400 hover:text-blue-300 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filters</button>
+                    <div class="flex items-center gap-3">
+                        <button onclick="clearFilters()" class="text-blue-400 hover:text-blue-300 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filters</button>
+                        <button id="load-data-btn" onclick="loadMarketData()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-chart-bar"></i> Load Market Data
+                        </button>
+                    </div>
+                </div>
+                <!-- Progress bar -->
+                <div id="fetch-progress-wrap" class="hidden mt-2">
+                    <div class="w-full bg-slate-800 rounded-full h-1.5">
+                        <div id="fetch-progress-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div>
+                    </div>
+                    <p id="fetch-progress-label" class="text-[11px] text-slate-500 mt-1"></p>
                 </div>
             </div>
 
             <!-- Main Table Grid -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                                <th class="p-4 pl-6">Company</th>
+                                <th class="p-4 pl-6 sticky left-0 bg-slate-950/95 z-10">Company</th>
                                 <th class="p-4">Sector</th>
                                 <th class="p-4">Index</th>
                                 <th class="p-4">Davis AI Category</th>
-                                <th class="p-4">Strategic Moat / Vulnerability</th>
-                                <th class="p-4 text-center">Action</th>
+                                <th class="p-4">Strategic Moat</th>
+                                <th class="p-4 text-right whitespace-nowrap">Mkt Cap</th>
+                                <th class="p-4 text-right whitespace-nowrap">P/E (LTM)</th>
+                                <th class="p-4 text-right whitespace-nowrap">YTD</th>
+                                <th class="p-4 text-right whitespace-nowrap">1Y Return</th>
+                                <th class="p-4 text-right whitespace-nowrap">3Y CAGR</th>
+                                <th class="p-4 text-right whitespace-nowrap">5Y CAGR</th>
+                                <th class="p-4 text-right whitespace-nowrap">ROE</th>
+                                <th class="p-4 text-right whitespace-nowrap">Div %</th>
+                                <th class="p-4 text-center">Detail</th>
                             </tr>
                         </thead>
                         <tbody id="equity-table-body" class="divide-y divide-slate-800/50 text-sm">
@@ -2783,6 +2803,7 @@
 
         // On document load
         window.onload = function() {
+            loadCachedFinanceData();
             renderTable();
             initCharts();
             calculateCustomPortfolio();
@@ -2819,7 +2840,7 @@
             if (filteredDatabase.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="p-8 text-center text-slate-500">
+                        <td colspan="14" class="p-8 text-center text-slate-500">
                             <i class="fa-solid fa-folder-open text-3xl mb-3 block"></i>
                             No companies match your current search criteria.
                         </td>
@@ -2847,44 +2868,215 @@
                     indexBadge = `<span class="bg-purple-950/40 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/20">NASDAQ-100</span>`;
                 }
 
+                const fd = financialData[company.ticker] || {};
+
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-800/30 transition-all cursor-pointer";
-                tr.onclick = (e) => {
-                    // Prevent row click firing if clicking on the view button itself
-                    openModal(company);
-                };
+                tr.className = "hover:bg-slate-800/30 transition-all cursor-pointer border-b border-slate-800/50";
+                tr.onclick = () => openModal(company);
 
                 tr.innerHTML = `
-                    <td class="p-4 pl-6">
+                    <td class="p-4 pl-6 sticky left-0 bg-slate-900 hover:bg-slate-800/60 z-10">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-slate-200">
+                            <div class="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-[11px] text-slate-200 shrink-0">
                                 ${company.ticker}
                             </div>
                             <div>
-                                <span class="font-semibold text-slate-100 block">${company.name}</span>
-                                <span class="text-[11px] text-slate-400">${company.ticker}</span>
+                                <span class="font-semibold text-slate-100 block leading-tight">${company.name}</span>
+                                <span class="text-[11px] text-slate-500">${company.ticker}</span>
                             </div>
                         </div>
                     </td>
-                    <td class="p-4 text-slate-300 font-medium">${company.sector}</td>
+                    <td class="p-4 text-slate-400 text-xs whitespace-nowrap">${company.sector}</td>
                     <td class="p-4">${indexBadge}</td>
                     <td class="p-4">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass} whitespace-nowrap">
                             <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            ${company.category === 'Casualties' ? 'Casualties (Walking Dead)' : company.category}
+                            ${company.category === 'Casualties' ? 'Walking Dead' : company.category}
                         </span>
                     </td>
                     <td class="p-4">
-                        <p class="text-xs text-slate-400 max-w-sm truncate" title="${company.moat}">${company.moat}</p>
+                        <p class="text-xs text-slate-400 max-w-[220px] truncate" title="${company.moat}">${company.moat}</p>
                     </td>
+                    <td class="p-4 text-right font-mono text-xs text-slate-300 whitespace-nowrap">${fmtMarketCap(fd.marketCap)}</td>
+                    <td class="p-4 text-right font-mono text-xs text-slate-300 whitespace-nowrap">${fmtPE(fd.pe)}</td>
+                    <td class="p-4 text-right font-mono text-xs whitespace-nowrap ${fmtReturnClass(fd.ytd)}">${fmtPct(fd.ytd)}</td>
+                    <td class="p-4 text-right font-mono text-xs whitespace-nowrap ${fmtReturnClass(fd.return1y)}">${fmtPct(fd.return1y)}</td>
+                    <td class="p-4 text-right font-mono text-xs whitespace-nowrap ${fmtReturnClass(fd.cagr3y)}">${fmtPct(fd.cagr3y)}</td>
+                    <td class="p-4 text-right font-mono text-xs whitespace-nowrap ${fmtReturnClass(fd.cagr5y)}">${fmtPct(fd.cagr5y)}</td>
+                    <td class="p-4 text-right font-mono text-xs whitespace-nowrap ${fmtReturnClass(fd.roe)}">${fmtPct(fd.roe)}</td>
+                    <td class="p-4 text-right font-mono text-xs text-slate-300 whitespace-nowrap">${fmtDiv(fd.div)}</td>
                     <td class="p-4 text-center">
-                        <button class="text-blue-400 hover:text-white hover:bg-blue-600/20 p-2 rounded-lg transition-all" onclick="event.stopPropagation(); openModal(${JSON.stringify(company).replace(/"/g, '&quot;')})">
-                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Analyze
+                        <button class="text-blue-400 hover:text-white hover:bg-blue-600/20 px-2 py-1 rounded-lg transition-all text-xs whitespace-nowrap" onclick="event.stopPropagation(); openModal(${JSON.stringify(company).replace(/"/g, '&quot;')})">
+                            <i class="fa-solid fa-magnifying-glass mr-1"></i>Detail
                         </button>
                     </td>
                 `;
                 tableBody.appendChild(tr);
             });
+        }
+
+        // ── Financial data helpers ─────────────────────────────────────────
+        let financialData = {};
+
+        function fmtMarketCap(n) {
+            if (n == null) return '<span class="text-slate-600">--</span>';
+            if (n >= 1e12) return `$${(n/1e12).toFixed(2)}T`;
+            if (n >= 1e9)  return `$${(n/1e9).toFixed(1)}B`;
+            return `$${(n/1e6).toFixed(0)}M`;
+        }
+        function fmtPE(n) {
+            if (n == null || n <= 0 || n > 999) return '<span class="text-slate-600">--</span>';
+            return n.toFixed(1) + 'x';
+        }
+        function fmtPct(n) {
+            if (n == null) return '<span class="text-slate-600">--</span>';
+            const pct = (n * 100).toFixed(1);
+            return (n >= 0 ? '+' : '') + pct + '%';
+        }
+        function fmtDiv(n) {
+            if (n == null || n === 0) return '<span class="text-slate-600">--</span>';
+            return (n * 100).toFixed(2) + '%';
+        }
+        function fmtReturnClass(n) {
+            if (n == null) return '';
+            return n >= 0 ? 'text-emerald-400' : 'text-red-400';
+        }
+
+        // ── Market data fetch ──────────────────────────────────────────────
+        async function loadMarketData() {
+            const btn = document.getElementById('load-data-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading...';
+            document.getElementById('fetch-progress-wrap').classList.remove('hidden');
+            document.getElementById('data-status').classList.remove('hidden');
+            document.getElementById('data-status').textContent = 'Fetching market data from Yahoo Finance…';
+
+            const tickers = indexDatabase.map(c => c.ticker);
+            const total = tickers.length;
+            let done = 0;
+
+            const setProgress = (n, msg) => {
+                const pct = Math.round((n / total) * 100);
+                document.getElementById('fetch-progress-bar').style.width = pct + '%';
+                document.getElementById('fetch-progress-label').textContent = msg;
+            };
+
+            // Step 1: Batch quotes — market cap, P/E, dividend, 52-week return
+            const quoteBatch = 50;
+            for (let i = 0; i < tickers.length; i += quoteBatch) {
+                const batch = tickers.slice(i, i + quoteBatch);
+                setProgress(done, `Fetching quotes ${i+1}–${Math.min(i+quoteBatch, total)} of ${total}…`);
+                try {
+                    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=marketCap,trailingPE,trailingAnnualDividendYield,fiftyTwoWeekChangePercent,regularMarketChangePercent`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json();
+                    (json?.quoteResponse?.result || []).forEach(q => {
+                        if (!financialData[q.symbol]) financialData[q.symbol] = {};
+                        const fd = financialData[q.symbol];
+                        fd.marketCap = q.marketCap ?? fd.marketCap;
+                        fd.pe        = q.trailingPE ?? fd.pe;
+                        fd.div       = q.trailingAnnualDividendYield ?? fd.div;
+                        fd.return1y  = q.fiftyTwoWeekChangePercent != null
+                                       ? q.fiftyTwoWeekChangePercent / 100
+                                       : fd.return1y;
+                    });
+                } catch(e) { console.warn('Quote fetch error', e); }
+                done += batch.length;
+                await sleep(150);
+            }
+
+            // Step 2: Spark data — YTD, 1Y (confirm), 3Y CAGR, 5Y CAGR
+            const sparkBatch = 20;
+            for (let i = 0; i < tickers.length; i += sparkBatch) {
+                const batch = tickers.slice(i, i + sparkBatch);
+                setProgress(done - tickers.length + i, `Fetching historical data ${i+1}–${Math.min(i+sparkBatch, total)} of ${total}…`);
+                try {
+                    const url = `https://query2.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=5y&interval=3mo`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json();
+                    (json?.spark?.result || []).forEach(s => {
+                        const sym = s.symbol;
+                        const resp = s?.response?.[0];
+                        const closes = resp?.indicators?.adjclose?.[0]?.adjclose;
+                        const timestamps = resp?.timestamp;
+                        if (!closes || closes.length < 2) return;
+                        if (!financialData[sym]) financialData[sym] = {};
+                        const fd = financialData[sym];
+                        const now = closes[closes.length - 1];
+                        const n = closes.length;
+
+                        // YTD: find the last close before Jan 1 of current year
+                        const janFirst = new Date(new Date().getFullYear(), 0, 1).getTime() / 1000;
+                        let ytdBase = null;
+                        for (let j = n - 1; j >= 0; j--) {
+                            if (timestamps[j] < janFirst) { ytdBase = closes[j]; break; }
+                        }
+                        if (ytdBase && ytdBase > 0) fd.ytd = (now - ytdBase) / ytdBase;
+
+                        // 1Y: ~4 quarters back
+                        const p1y = closes[Math.max(0, n - 5)];
+                        if (p1y && p1y > 0) fd.return1y = (now - p1y) / p1y;
+
+                        // 3Y CAGR: ~12 quarters back
+                        const p3y = closes[Math.max(0, n - 13)];
+                        if (p3y && p3y > 0) fd.cagr3y = Math.pow(now / p3y, 1/3) - 1;
+
+                        // 5Y CAGR: earliest data point
+                        const p5y = closes[0];
+                        if (p5y && p5y > 0 && n >= 16) fd.cagr5y = Math.pow(now / p5y, 1/5) - 1;
+                    });
+                } catch(e) { console.warn('Spark fetch error', e); }
+                await sleep(200);
+            }
+
+            // Step 3: ROE from quoteSummary financialData module (batched with delay)
+            setProgress(total, 'Fetching ROE data…');
+            for (let i = 0; i < tickers.length; i++) {
+                if (i % 30 === 0) {
+                    setProgress(i, `Fetching ROE ${i+1}–${Math.min(i+30, total)} of ${total}…`);
+                    await sleep(500);
+                }
+                try {
+                    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${tickers[i]}?modules=financialData`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json();
+                    const roe = json?.quoteSummary?.result?.[0]?.financialData?.returnOnEquity?.raw;
+                    if (roe != null) {
+                        if (!financialData[tickers[i]]) financialData[tickers[i]] = {};
+                        financialData[tickers[i]].roe = roe;
+                    }
+                } catch(e) { /* skip */ }
+                if (i % 5 === 0) await sleep(50);
+            }
+
+            // Save to sessionStorage
+            try {
+                sessionStorage.setItem('davis_finance', JSON.stringify({ data: financialData, ts: Date.now() }));
+            } catch(e) {}
+
+            setProgress(total, `Loaded data for ${Object.keys(financialData).length} companies`);
+            document.getElementById('data-status').textContent = `Market data loaded · ${new Date().toLocaleTimeString()}`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> Refresh Data';
+            renderTable();
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function loadCachedFinanceData() {
+            try {
+                const raw = sessionStorage.getItem('davis_finance');
+                if (!raw) return;
+                const { data, ts } = JSON.parse(raw);
+                if (Date.now() - ts < 4 * 60 * 60 * 1000) { // 4h TTL
+                    financialData = data;
+                    document.getElementById('data-status').classList.remove('hidden');
+                    document.getElementById('data-status').textContent =
+                        `Market data from cache · loaded at ${new Date(ts).toLocaleTimeString()}`;
+                    document.getElementById('load-data-btn').innerHTML =
+                        '<i class="fa-solid fa-rotate mr-1"></i> Refresh Data';
+                }
+            } catch(e) {}
         }
 
         // Search and Filter Functions
