@@ -64,19 +64,22 @@ def fetch_history_single(ticker):
             return {}
 
         closes = hist["Close"].dropna()
+
+        # Strip timezone so date comparisons work reliably
+        if closes.index.tz is not None:
+            closes.index = closes.index.tz_convert(None)
+
         price_now = float(closes.iloc[-1])
+        idx_dates = closes.index.normalize().date  # numpy array of date objects
 
         # YTD — last close before Jan 1 this year
-        ytd_base = None
-        for idx in reversed(range(len(closes))):
-            if closes.index[idx].date() < jan_first:
-                ytd_base = float(closes.iloc[idx])
-                break
+        ytd_mask = idx_dates < jan_first
+        ytd_base = float(closes[ytd_mask].iloc[-1]) if ytd_mask.any() else None
 
         def price_at(years_back):
             target = date(today.year - years_back, today.month, today.day)
-            candidates = closes[closes.index.date <= target]
-            return float(candidates.iloc[-1]) if len(candidates) > 0 else None
+            mask = idx_dates <= target
+            return float(closes[mask].iloc[-1]) if mask.any() else None
 
         p1y = price_at(1)
         p3y = price_at(3)
@@ -89,8 +92,8 @@ def fetch_history_single(ticker):
         if p5y and len(closes) >= 16:
                               entry["cagr5y"]   = cagr(p5y, price_now, 5)
         return entry
-    except Exception:
-        return {}
+    except Exception as e:
+        return {"_err": str(e)[:60]}
 
 
 def fetch_fundamentals_single(ticker):
@@ -143,10 +146,11 @@ def main():
         fd.update(fetch_history_single(ticker))
         fd.update(fetch_fundamentals_single(ticker))
 
+        err = fd.pop("_err", None)
         if fd:
             merged[ticker] = fd
         else:
-            failed.append(ticker)
+            failed.append(ticker + (f"({err})" if err else ""))
 
         # polite rate limiting
         time.sleep(0.4)
