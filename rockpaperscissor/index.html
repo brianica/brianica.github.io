@@ -518,7 +518,7 @@
             <div id="crop-container" style="display: none;">
                 <canvas id="crop-canvas" width="224" height="224"></canvas>
             </div>
-            <audio id="countdown-sound" src="rps2.mp3"></audio>
+            <audio id="countdown-sound" src="woman.mp3"></audio>
         </div>
 
         <!-- Game Column -->
@@ -715,12 +715,15 @@
             setTrackedTimeout(() => {
                 gameState = 'PLAY_SOUND';
                 countdownSound.currentTime = 0;
-                countdownSound.play();
+                countdownSound.removeEventListener('error', scheduleListeningFallback);
+                countdownSound.addEventListener('error', scheduleListeningFallback, { once: true });
+                countdownSound.play().catch(scheduleListeningFallback);
             }, 500);
         }
 
-        countdownSound.onended = () => {
-            if (gameState !== 'PLAY_SOUND') return; // Prevent triggering if sound was stopped by ESC
+        function beginListening() {
+            countdownSound.removeEventListener('error', scheduleListeningFallback);
+            if (gameState !== 'PLAY_SOUND') return;
 
             const labelsContainer = document.querySelector('.labels');
             predText.classList.remove('countdown-style'); 
@@ -736,6 +739,16 @@
                 gameState = 'PROCESSING';
                 processMove();
             }, LISTENING_WINDOW);
+        }
+
+        function scheduleListeningFallback() {
+            // A missing file or a rejected play() never fires onended.
+            if (gameState !== 'PLAY_SOUND') return;
+            setTrackedTimeout(beginListening, 1200);
+        }
+
+        countdownSound.onended = () => {
+            beginListening();
         };
 
         function processMove() {
@@ -869,11 +882,13 @@
                 themeToggle.checked = false;
             }
 
-            const savedSound = localStorage.getItem('sound');
-            if (savedSound) {
-                soundSelect.value = savedSound;
-                countdownSound.src = savedSound;
+            const validSounds = [...soundSelect.options].map((opt) => opt.value);
+            let sound = localStorage.getItem('sound');
+            if (!sound || !validSounds.includes(sound)) {
+                sound = validSounds[0];
             }
+            soundSelect.value = sound;
+            countdownSound.src = sound;
         });
     </script>
 </body>
